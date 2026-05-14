@@ -73,6 +73,7 @@ import {
 } from './utils/project.js';
 import type { StorageConfig } from './utils/project.js';
 import { createStorage, createVectorStore } from './utils/storage-factory.js';
+import { createSignalsPubSub } from './utils/signals-pubsub.js';
 import { acquireThreadLock, releaseThreadLock } from './utils/thread-lock.js';
 
 const PROVIDER_TO_OAUTH_ID: Record<string, string> = {
@@ -226,6 +227,8 @@ export async function createMastraCode(config?: MastraCodeConfig) {
     project.resourceId = resourceIdOverride;
     project.resourceIdOverride = true;
   }
+
+  const signalsPubSub = createSignalsPubSub(project.resourceId);
 
   // Storage
   const storageConfig = config?.storage ?? getStorageConfig(project.rootPath, globalSettings.storage);
@@ -524,6 +527,7 @@ export async function createMastraCode(config?: MastraCodeConfig) {
     storage,
     observability,
     memory,
+    pubsub: signalsPubSub,
     stateSchema,
     subagents,
     resolveModel: modelId => resolveModel(modelId) as LanguageModel,
@@ -657,6 +661,7 @@ export async function createMastraCode(config?: MastraCodeConfig) {
     harness,
     mcpManager,
     hookManager,
+    signalsPubSub,
     authStorage,
     resolveModel,
     storageWarning,

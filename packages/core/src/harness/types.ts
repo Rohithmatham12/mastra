@@ -1,6 +1,7 @@
 import type { Agent } from '../agent';
 import type { AgentInstructions, ToolsInput } from '../agent/types';
 import type { MastraBrowser } from '../browser/browser';
+import type { PubSub } from '../events/pubsub';
 import type { MastraLanguageModel } from '../llm/model/shared.types';
 import type { LoopOptions } from '../loop/types';
 import type { MastraMemory } from '../memory/memory';
@@ -166,6 +167,9 @@ export interface HarnessConfig<TState = {}> {
 
   /** Storage backend for persistence (threads, messages, state) */
   storage?: MastraCompositeStore;
+
+  /** Pub/sub system used by the internal Mastra instance and mode agents. */
+  pubsub?: PubSub;
 
   /** Schema defining the shape of harness state (Zod, JSON Schema, Standard Schema, etc.) */
   stateSchema?: PublicSchema<TState, any>;

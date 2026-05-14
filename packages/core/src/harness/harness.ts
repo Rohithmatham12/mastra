@@ -347,6 +347,7 @@ export class Harness<TState = {}> {
       this.#internalMastra = new Mastra({
         logger: false,
         storage: this.config.storage,
+        ...(this.config.pubsub ? { pubsub: this.config.pubsub } : {}),
         ...(this.config.observability ? { observability: this.config.observability } : {}),
       });
       await this.#internalMastra.getStorage()!.init();
@@ -396,6 +397,9 @@ export class Harness<TState = {}> {
       }
       if (browserForAgents && !agent.hasOwnBrowser()) {
         agent.setBrowser(browserForAgents as MastraBrowser);
+      }
+      if (this.config.pubsub && !agent.hasOwnPubSub()) {
+        agent.__setPubSub(this.config.pubsub);
       }
 
       if (this.#internalMastra && !alreadyHasMastra) {
@@ -608,10 +612,26 @@ export class Harness<TState = {}> {
    */
   private getCurrentAgent(): Agent {
     const mode = this.getCurrentMode();
-    if (typeof mode.agent === 'function') {
-      return mode.agent(this.state);
+    const agent = typeof mode.agent === 'function' ? mode.agent(this.state) : mode.agent;
+    this.propagateRuntimeServicesToAgent(agent);
+    return agent;
+  }
+
+  private propagateRuntimeServicesToAgent(agent: Agent): void {
+    if (this.config.memory && !agent.hasOwnMemory()) {
+      agent.__setMemory(this.config.memory);
     }
-    return mode.agent;
+    if (this.config.pubsub && !agent.hasOwnPubSub()) {
+      agent.__setPubSub(this.config.pubsub);
+    }
+    const workspaceForAgent = this.workspaceFn ?? this.workspace;
+    if (workspaceForAgent && !agent.hasOwnWorkspace()) {
+      agent.__setWorkspace(workspaceForAgent);
+    }
+    const browserForAgent = this.browserFn ?? this.browser;
+    if (browserForAgent && !agent.hasOwnBrowser()) {
+      agent.setBrowser(browserForAgent as MastraBrowser);
+    }
   }
 
   /**
