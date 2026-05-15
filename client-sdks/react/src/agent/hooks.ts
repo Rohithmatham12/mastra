@@ -9,6 +9,7 @@ import type { ChunkType, NetworkChunkType } from '@mastra/core/stream';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MastraUIMessage } from '../lib/ai-sdk';
 import { extractRunIdFromMessages } from './extractRunIdFromMessages';
+import { convertSignalDataToBase64String } from './signal-data';
 import type { ModelSettings } from './types';
 import { finishStreamingAssistantMessage, toUIMessage } from '@/lib/ai-sdk';
 import { resolveInitialMessages } from '@/lib/ai-sdk/memory/resolveInitialMessages';
@@ -120,40 +121,45 @@ export const useChat = ({
   }, [propsRequestContext]);
 
   type UserMessageSignalContents = Extract<SendAgentSignalParams['signal'], { type: 'user-message' }>['contents'];
-  type SignalContentPart = Exclude<UserMessageSignalContents, string>[number];
+  type SignalContentPart =
+    | { type: 'text'; text: string }
+    | { type: 'file'; data: string; mimeType: string; filename?: string };
+
+  const normalizeSignalFileData = (data: string | URL | ArrayBuffer | Uint8Array) => {
+    if (data instanceof URL) return data.toString();
+    return convertSignalDataToBase64String(data);
+  };
 
   const getSignalContents = (coreUserMessages: CoreUserMessage[]): UserMessageSignalContents => {
-    const parts: SignalContentPart[] = [];
-    for (const message of coreUserMessages) {
+    const parts = coreUserMessages.reduce<SignalContentPart[]>((allParts, message) => {
       if (typeof message.content === 'string') {
-        parts.push({ type: 'text', text: message.content });
-        continue;
+        allParts.push({ type: 'text', text: message.content });
+        return allParts;
       }
+
       for (const part of message.content) {
         if (part.type === 'text') {
-          parts.push({ type: 'text', text: part.text });
+          allParts.push({ type: 'text', text: part.text });
         } else if (part.type === 'file') {
-          parts.push({
+          allParts.push({
             type: 'file',
-            data: typeof part.data === 'string' ? part.data : '',
+            data: normalizeSignalFileData(part.data),
             mimeType: part.mimeType,
             ...(part.filename ? { filename: part.filename } : {}),
-          } as SignalContentPart);
+          });
         } else if (part.type === 'image') {
-          parts.push({
+          allParts.push({
             type: 'file',
-            data: typeof part.image === 'string' ? part.image : '',
+            data: normalizeSignalFileData(part.image),
             mimeType: part.mimeType ?? 'image/png',
-          } as SignalContentPart);
+          });
         }
       }
-    }
 
-    if (parts.length === 1 && parts[0]?.type === 'text') {
-      return parts[0].text;
-    }
+      return allParts;
+    }, []);
 
-    return parts;
+    return parts.length === 1 && parts[0]?.type === 'text' ? parts[0].text : parts;
   };
 
   const markThreadSignalsUnsupported = useCallback(() => {
